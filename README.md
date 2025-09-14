@@ -49,6 +49,11 @@ SCOPE COVERAGE
 - Frontend: Next.js on Vercel (free tier)
 - Backend: FastAPI on Render / Railway (free tier)
 - Database & Auth: Firebase (Firestore + Auth)
+----------------------------------------------------------------
+
+API Documentation (Swagger UI)
+The backend exposes a full **REST API** with interactive documentation via **Swagger UI**.
+<img width="1920" height="952" alt="Ekran Resmi 2025-09-14 18 10 24" src="https://github.com/user-attachments/assets/e723953f-59a5-423b-83bb-90ee61d1acd3" />
 
 ----------------------------------------------------------------
 TECH STACK
