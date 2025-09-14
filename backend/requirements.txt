@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+python-multipart
+firebase-admin
+google-cloud-firestore
+pytesseract
+pillow
+pdf2image
+langdetect==1.0.9
+scikit-learn
+numpy
+openai>=1.40.0
+requests>=2.31

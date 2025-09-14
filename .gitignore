@@ -1,0 +1,27 @@
+# Node / Next
+/frontend/node_modules
+/frontend/.next
+/frontend/.env
+/frontend/.env.local
+
+# Python
+/backend/.venv
+/backend/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Env & secrets
+*.env
+*.env.local
+/backend/invoice-ai-admin.json
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Builds / logs
+dist/
+build/
+*.log
