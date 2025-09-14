@@ -52,7 +52,10 @@ SCOPE COVERAGE
 ----------------------------------------------------------------
 
 API Documentation (Swagger UI)
+
 The backend exposes a full **REST API** with interactive documentation via **Swagger UI**.
+You can explore and test all endpoints (upload invoice, list invoices, chat, etc.) directly in your browser:
+[Live Swagger UI] https://invoice-ai-mvp.onrender.com/docs
 <img width="1920" height="952" alt="Ekran Resmi 2025-09-14 18 10 24" src="https://github.com/user-attachments/assets/e723953f-59a5-423b-83bb-90ee61d1acd3" />
 
 ----------------------------------------------------------------
