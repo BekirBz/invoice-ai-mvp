@@ -1,26 +1,32 @@
 # Backend için Dockerfile
 FROM python:3.11-slim
 
+# Ortam değişkenleri
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    PORT=10000
+
 # Çalışma klasörü
 WORKDIR /app
 
-# Gereksiz cache'leri kapatalım
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Sistem bağımlılıkları (tesseract + poppler) ve apt temizliği tek katmanda
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      tesseract-ocr \
+      poppler-utils \
+      libgl1 \
+ && rm -rf /var/lib/apt/lists/*
 
-# Sisteme bağımlılıkları kur
-RUN apt-get update && apt-get install -y \
-    tesseract-ocr \
-    poppler-utils \
-    libgl1 \
-    && rm -rf /var/lib/apt/lists/*
-
-# Gereksinimler
+# Python gereksinimleri
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Kodları kopyala
+# Uygulama kodu
 COPY . .
 
-# FastAPI backend başlat
+# (Opsiyonel) bilgilendirici: portu dışa aç
+EXPOSE 10000
+
+# FastAPI backend
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
