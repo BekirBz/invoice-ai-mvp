@@ -10,10 +10,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Çalışma klasörü
 WORKDIR /app
 
-# Sistem bağımlılıkları (tesseract + poppler) ve apt temizliği tek katmanda
+# Sistem bağımlılıkları: tesseract + poppler + dil paketleri
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       tesseract-ocr \
+      tesseract-ocr-eng \
+      tesseract-ocr-tur \
       poppler-utils \
       libgl1 \
  && rm -rf /var/lib/apt/lists/*
@@ -25,8 +27,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Uygulama kodu
 COPY . .
 
-# (Opsiyonel) bilgilendirici: portu dışa aç
 EXPOSE 10000
 
-# FastAPI backend
+# FastAPI backend başlat
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
