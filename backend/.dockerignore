@@ -2,6 +2,16 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
 *.db
 *.sqlite3
+
+# local environment
+.venv/
 .env
+.env.local
+
+# editor/cache
+.DS_Store
+.vscode/
+.idea/
