@@ -43,7 +43,13 @@ app = FastAPI(title="Invoice AI MVP")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "*"],
+    allow_origins=[
+        "http://localhost:3000",                         # Local dev için
+        "http://127.0.0.1:3000",                         # Local dev için
+        "https://invoice-ai-mvp-pf77.vercel.app",        # Senin canlı frontend domainin
+        "https://*.vercel.app"                           # Opsiyonel: tüm vercel.app domainleri
+    ],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
