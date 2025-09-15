@@ -2,7 +2,7 @@
 """
 Persistence layer for Invoice AI MVP
 - Initializes Firestore if a service account JSON is present (guarded: no double init)
-- Falls back to an in-memory store
+- Falls back to an in-memory store (userId -> [docs]) so uploads append instead of overwrite
 - Exposes: save_invoice, get_invoice, list_invoices_for_user, coerce_legacy
 """
 
@@ -19,7 +19,12 @@ from typing import Any, Dict, List, Optional
 # ---------------------------------------------------------------------------
 FIREBASE_READY = False
 DB = None  # Firestore client or None
-MEM_STORE: Dict[str, Dict[str, Any]] = {}  # in-memory fallback
+
+# In-memory fallback:
+# - MEM_LIST: userId -> [docs] (append; newest first)
+# - MEM_BY_ID: id -> doc (fast lookup)
+MEM_LIST: Dict[str, List[Dict[str, Any]]] = {}
+MEM_BY_ID: Dict[str, Dict[str, Any]] = {}
 
 # ---------------------------------------------------------------------------
 # Detect new Firestore filtering API (FieldFilter)
@@ -67,15 +72,13 @@ def _iso_now() -> str:
 
 def coerce_legacy(doc: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Normalize legacy/loose documents to the schema expected by frontend.
+    Normalize loose/legacy documents to the schema expected by frontend.
     Ensures keys exist and types are sane.
     """
     d = dict(doc)
 
-    # id
+    # id & userId
     d.setdefault("id", d.get("id") or uuid.uuid4().hex)
-
-    # userId
     d.setdefault("userId", d.get("userId") or "anonymous")
 
     # ocr_text (from rawText if necessary)
@@ -101,7 +104,6 @@ def coerce_legacy(doc: Dict[str, Any]) -> Dict[str, Any]:
         elif isinstance(created, (int, float)):
             d["createdAt"] = datetime.utcfromtimestamp(float(created)).isoformat() + "Z"
     except Exception:
-        # if anything goes wrong, just set below
         pass
     d.setdefault("createdAt", _iso_now())
 
@@ -112,6 +114,8 @@ def coerce_legacy(doc: Dict[str, Any]) -> Dict[str, Any]:
     d.setdefault("currency", None)
     d.setdefault("vat", None)
     d.setdefault("fraud_score", None)
+    d.setdefault("language", None)
+    d.setdefault("docType", None)
 
     return d
 
@@ -121,18 +125,24 @@ def coerce_legacy(doc: Dict[str, Any]) -> Dict[str, Any]:
 
 def save_invoice(doc: Dict[str, Any]) -> str:
     """
-    Create/overwrite invoice document.
+    Create/append invoice document.
     Always coerces the input to the expected schema.
     """
     d = coerce_legacy(doc)
+    uid = d.get("userId") or "anonymous"
+    inv_id = d["id"]
 
     if FIREBASE_READY and DB is not None:
-        DB.collection("invoices").document(d["id"]).set(d)
-        return d["id"]
+        DB.collection("invoices").document(inv_id).set(d)
+        return inv_id
 
-    # In-memory: only store dicts; never lists/other types
-    MEM_STORE[d["id"]] = d
-    return d["id"]
+    # In-memory: append to the user's list + index by id
+    MEM_BY_ID[inv_id] = d
+    MEM_LIST.setdefault(uid, []).append(d)
+    # newest first
+    MEM_LIST[uid].sort(key=lambda x: str(x.get("createdAt") or ""), reverse=True)
+    print(f"[store.mem] saved id={inv_id} for user={uid}; count={len(MEM_LIST[uid])}")
+    return inv_id
 
 
 def get_invoice(invoice_id: str) -> Optional[Dict[str, Any]]:
@@ -140,13 +150,12 @@ def get_invoice(invoice_id: str) -> Optional[Dict[str, Any]]:
     if FIREBASE_READY and DB is not None:
         snap = DB.collection("invoices").document(invoice_id).get()
         return snap.to_dict() if snap.exists else None
-    return MEM_STORE.get(invoice_id)
+    return MEM_BY_ID.get(invoice_id)
 
 
 def list_invoices_for_user(user_id: Optional[str]) -> List[Dict[str, Any]]:
     """
     List invoices, optionally filtered by userId, newest first.
-    Robust against accidental non-dict values in MEM_STORE.
     """
     if FIREBASE_READY and DB is not None:
         q = DB.collection("invoices")
@@ -160,23 +169,13 @@ def list_invoices_for_user(user_id: Optional[str]) -> List[Dict[str, Any]]:
         docs.sort(key=lambda x: str(x.get("createdAt") or ""), reverse=True)
         return docs
 
-    # -------- In-memory (robust) --------
-    results: List[Dict[str, Any]] = []
-    warned = False
+    # In-memory
+    if user_id:
+        return list(MEM_LIST.get(user_id, []))
 
-    for v in MEM_STORE.values():
-        if isinstance(v, dict):
-            if not user_id or v.get("userId") == user_id:
-                results.append(v)
-        elif isinstance(v, list):
-            # if someone accidentally stored a list, try to harvest dicts inside
-            for item in v:
-                if isinstance(item, dict) and (not user_id or item.get("userId") == user_id):
-                    results.append(item)
-        else:
-            if not warned:
-                logging.warning("MEM_STORE contains a non-dict/list value: %r", type(v))
-                warned = True
-
-    results.sort(key=lambda x: str(x.get("createdAt") or ""), reverse=True)
-    return results
+    # userId verilmediyse herkesin hepsi (flatten)
+    all_docs: List[Dict[str, Any]] = []
+    for arr in MEM_LIST.values():
+        all_docs.extend(arr)
+    all_docs.sort(key=lambda x: str(x.get("createdAt") or ""), reverse=True)
+    return all_docs
