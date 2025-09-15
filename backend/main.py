@@ -42,21 +42,22 @@ from chat import router as chat_router
 # ------------------------------------------------------------------------------
 # App / CORS
 # ------------------------------------------------------------------------------
+
 app = FastAPI(title="Invoice AI MVP")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",                         # Local dev için
-        "http://127.0.0.1:3000",                         # Local dev için
-        "https://invoice-ai-mvp-pf77.vercel.app",        # Senin canlı frontend domainin
-        "https://*.vercel.app"                           # Opsiyonel: tüm vercel.app domainleri
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://invoice-ai-mvp-pf77.vercel.app",  # eski
+        "https://invoice-ai-mvp-pf84.vercel.app",  # yeni
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # tüm vercel.app alt alan adları
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"],  # Content-Type, Authorization vs. hepsi
 )
-
 # ------------------------------------------------------------------------------
 # Models (match frontend)
 # ------------------------------------------------------------------------------
