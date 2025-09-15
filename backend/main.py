@@ -16,6 +16,9 @@ from PIL import Image, UnidentifiedImageError
 import pytesseract
 from pdf2image import convert_from_path
 
+import shutil, pytesseract
+pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract") or "/usr/bin/tesseract"
+
 # Optional language detection
 try:
     from langdetect import detect as lang_detect
