@@ -102,27 +102,36 @@ def _open_image_resilient(content: bytes) -> Image.Image:
         img = img.convert("RGB")
     return img
 
-def ocr_file_to_texts(upload: UploadFile) -> List[str]:
-    """Accept PDF or image, return list of page texts."""
-    content: bytes = upload.file.read()
-    upload.file.seek(0)
-    name = (upload.filename or "").lower()
-    texts: List[str] = []
+def ocr_bytes_to_texts(data: bytes, filename: Optional[str] = None) -> list[str]:
+    """
+    Bytes içeriği (PDF/PNG/JPG) OCR eder.
+    PDF ise geçici dosyaya yazıp convert_from_path ile sayfalara çevirir.
+    Görsellerde direkt pytesseract uygulanır.
+    """
+    texts: list[str] = []
+    name = (filename or "").lower()
 
-    if name.endswith(".pdf"):
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(content)
-            tmp_path = tmp.name
-        try:
-            pages = convert_from_path(tmp_path, 300)  # requires poppler
-        finally:
-            os.unlink(tmp_path)
-        for pg in pages:
-            texts.append(pytesseract.image_to_string(pg))
-        return texts
+    try:
+        if name.endswith(".pdf"):
+            # PDF → temp dosya → sayfa resimleri
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=True) as tf:
+                tf.write(data)
+                tf.flush()
+                pages = convert_from_path(tf.name, 300)  # poppler-utils gerekir
+            for img in pages:
+                txt = pytesseract.image_to_string(img)
+                if txt:
+                    texts.append(txt)
+        else:
+            # PNG/JPG → direkt
+            img = _open_image_resilient(data)
+            txt = pytesseract.image_to_string(img)
+            if txt:
+                texts.append(txt)
+    except UnidentifiedImageError:
+        # görüntü tanınmadı
+        pass
 
-    img = _open_image_resilient(content)
-    texts.append(pytesseract.image_to_string(img))
     return texts
 
 # ------------------------------------------------------------------------------
@@ -231,7 +240,18 @@ async def upload_invoice_ep(
     """Upload PDF/PNG/JPG, run OCR + simple AI pipeline, store structured result."""
     try:
         uid = userId or userId_q or "anonymous"
-        texts = ocr_file_to_texts(file)
+
+        # UploadFile içeriğini *async* okuyalım (Render/uvicorn ile daha stabil)
+        data = await file.read()
+        if not data:
+            raise ValueError("Boş dosya alındı.")
+        await file.seek(0)  # ileride tekrar okunursa sorun çıkmasın
+
+        # OCR
+        texts = ocr_bytes_to_texts(data, filename=file.filename)
+        if not texts:
+            raise ValueError("OCR içerik çıkaramadı (format/bağımlılık?).")
+
         merged = "\n".join(texts)
 
         currency = detect_currency(merged)
@@ -268,9 +288,14 @@ async def upload_invoice_ep(
 
         save_invoice(doc)
         return InvoiceOut(**doc)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OCR/parse failed: {e}")
 
+    except Exception as e:
+        # Render loglarında net görünsün:
+        import traceback
+        print("[/upload_invoice] ERROR:", repr(e))
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"OCR/parse failed: {e}")
+        
 @app.get("/invoices", response_model=List[InvoiceOut])
 def list_invoices_ep(userId: Optional[str] = Query(None, alias="userId")):
     """List invoices (optionally filtered by userId)."""
